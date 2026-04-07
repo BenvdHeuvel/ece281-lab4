@@ -25,7 +25,11 @@ end top_basys3;
 architecture top_basys3_arch of top_basys3 is
 
     -- signal declarations
-    
+    signal slow_clk : std_logic;
+    signal master_reset : std_logic;
+    signal floor1 : std_logic_vector(3 downto 0);
+    signal floor2 : std_logic_vector(3 downto 0);
+    signal tdm_data : std_logic_vector(3 downto 0);
   
 	-- component declarations
     component sevenseg_decoder is
@@ -70,14 +74,60 @@ architecture top_basys3_arch of top_basys3 is
 	
 begin
 	-- PORT MAPS ----------------------------------------
-    	
+    clk_div_port_stuff : clock_divider
+        generic map (
+            k_DIV => 25_000_000
+        )
+        port map (
+            i_clk   => clk,
+            i_reset => master_reset,
+            o_clk   => slow_clk 
+        );
 	
+    elev1_port_stuff : elevator_controller_fsm
+        port map (
+            i_clk      => slow_clk,
+            i_reset    => master_reset,
+            is_stopped => sw(14),
+            go_up_down => sw(15),
+            o_floor    => floor1
+        );
+        
+    elev2_port_stuff : elevator_controller_fsm
+        port map (
+            i_clk      => slow_clk,
+            i_reset    => master_reset,
+            is_stopped => sw(14),
+            go_up_down => sw(15),
+            o_floor    => floor2
+        );
+
+    tdm_port_stuff : TDM4
+        generic map ( k_WIDTH => 4 )
+        port map (
+            i_clk   => clk,
+            i_reset => master_reset,
+            i_D3    => "1111",
+            i_D2    => floor2,
+            i_D1    => "1111",
+            i_D0    => floor1,
+            o_data  => tdm_data,
+            o_sel   => an
+        );
+    
+    sevenseg_port_stuff : sevenseg_decoder
+    port map (
+        i_Hex   => tdm_data,
+        o_seg_n => seg
+    );
+
 	-- CONCURRENT STATEMENTS ----------------------------
 	
 	-- LED 15 gets the FSM slow clock signal. The rest are grounded.
-	
+	led <= (others => '0');
+    led(15) <= slow_clk;
 	-- leave unused switches UNCONNECTED. Ignore any warnings this causes.
 	
 	-- reset signals
-	
+	master_reset <= btnU;
 end top_basys3_arch;
